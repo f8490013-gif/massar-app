@@ -18,24 +18,19 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
 
       - name: Install dependencies
         run: npm install
 
       - name: Build
         run: npm run build
-        env:
-          # If deploying to https://<user>.github.io/<repo-name>/
-          # set this to /<repo-name>/  e.g. /massar-app/
-          # If using a custom domain or Vercel/Netlify, set to /
-          VITE_BASE: /
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
