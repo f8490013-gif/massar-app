@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useApp } from './context/AppContext'
 
 import Landing          from './pages/Landing'
@@ -26,7 +26,7 @@ function Require({ children, role }) {
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <HashRouter>
       <Routes>
         {/* Public */}
         <Route path="/"         element={<Landing />} />
@@ -47,12 +47,12 @@ export default function App() {
         <Route path="/driver/profile"  element={<Require role="driver"><DriverProfile /></Require>} />
 
         {/* Admin */}
-        <Route path="/admin"           element={<Require role="admin"><AdminDash /></Require>} />
-        <Route path="/admin/*"         element={<Require role="admin"><AdminDash /></Require>} />
+        <Route path="/admin"   element={<Require role="admin"><AdminDash /></Require>} />
+        <Route path="/admin/*" element={<Require role="admin"><AdminDash /></Require>} />
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </BrowserRouter>
+    </HashRouter>
   )
 }

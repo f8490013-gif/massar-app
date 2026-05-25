@@ -2,12 +2,12 @@ import { useNavigate } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
 import Layout from '../../components/Layout'
 import { recentTrips } from '../../data/mockData'
-import { Car, School, MapPin, Star, ChevronLeft, Tag } from 'lucide-react'
+import { Car, MapPin, ChevronLeft, Tag } from 'lucide-react'
 import clsx from 'clsx'
 
 const vehicleTypes = [
-  { id: 'car',    label: 'سيارة',        icon: '🚗', path: '/passenger/request?type=car' },
-  { id: 'school', label: 'نقل مدرسي',   icon: '🚌', path: '/passenger/school' },
+  { id: 'car',    label: 'سيارة',       icon: '🚗', path: '/passenger/request' },
+  { id: 'school', label: 'نقل مدرسي',  icon: '🚌', path: '/passenger/school' },
 ]
 
 const statusStyle = {
@@ -24,11 +24,10 @@ export default function PassengerDashboard() {
     <Layout title="الرئيسية">
       <div className="max-w-2xl mx-auto space-y-6">
 
-        {/* Greeting */}
+        {/* Greeting banner */}
         <div className="card bg-gradient-to-l from-primary-500 to-primary-400 dark:from-primary-600 dark:to-primary-500 text-black border-0">
           <p className="text-lg font-black">مرحباً، {user?.name || 'أحمد'} 👋</p>
           <p className="text-sm opacity-80 mt-1">إلى أين تريد الذهاب اليوم؟</p>
-          {/* Quick search */}
           <button
             onClick={() => navigate('/passenger/request')}
             className="mt-4 w-full bg-white/90 hover:bg-white rounded-2xl px-4 py-3 flex items-center gap-3 text-right transition-colors"
@@ -38,7 +37,7 @@ export default function PassengerDashboard() {
           </button>
         </div>
 
-        {/* Vehicle type quick select */}
+        {/* Ride type */}
         <div>
           <h2 className="font-bold mb-3">اختر نوع الرحلة</h2>
           <div className="grid grid-cols-2 gap-3">
@@ -55,7 +54,7 @@ export default function PassengerDashboard() {
           </div>
         </div>
 
-        {/* Promo banner */}
+        {/* Promo */}
         <div className="card bg-gradient-to-l from-black to-gray-900 dark:from-dark-card text-white border-0 flex items-center gap-4">
           <div className="w-12 h-12 bg-primary-500 rounded-2xl flex items-center justify-center shrink-0">
             <Tag size={22} className="text-black" />

@@ -4,12 +4,12 @@ import { useApp } from '../../context/AppContext'
 import Layout from '../../components/Layout'
 import MapView from '../../components/common/MapView'
 import { vehicleTypes, paymentMethods } from '../../data/mockData'
-import { MapPin, Navigation, ChevronLeft, ChevronDown } from 'lucide-react'
+import { MapPin, Navigation } from 'lucide-react'
 import clsx from 'clsx'
 
 export default function RequestRide() {
-  const [from, setFrom]     = useState('')
-  const [to, setTo]         = useState('')
+  const [from, setFrom]       = useState('')
+  const [to, setTo]           = useState('')
   const [vehicle, setVehicle] = useState('economy')
   const [payment, setPayment] = useState('mada')
   const [loading, setLoading] = useState(false)
@@ -19,10 +19,20 @@ export default function RequestRide() {
   const navigate = useNavigate()
 
   async function book() {
-    if (!from || !to) { showNotification('يرجى إدخال نقطة الانطلاق والوجهة', 'error'); return }
+    if (!from || !to) {
+      showNotification('يرجى إدخال نقطة الانطلاق والوجهة', 'error')
+      return
+    }
     setLoading(true)
     await new Promise(r => setTimeout(r, 1500))
-    setActiveRide({ from, to, vehicle, driver: { name: 'محمد علي', rating: 4.9, car: 'تويوتا كامري 2023', plate: 'ن ص م 1234' }, eta: '5:24', price: vehicleTypes.find(v => v.id === vehicle)?.price })
+    const selected = vehicleTypes.find(v => v.id === vehicle)
+    setActiveRide({
+      from,
+      to,
+      vehicle,
+      driver: { name: 'محمد علي', rating: 4.9, car: 'تويوتا كامري 2023', plate: 'ن ص م 1234' },
+      price: selected?.price ?? '—',
+    })
     showNotification('تم تأكيد الطلب! جارٍ البحث عن سائق…', 'success')
     setLoading(false)
     setConfirmed(true)
@@ -35,7 +45,7 @@ export default function RequestRide() {
     <Layout title="طلب مشوار">
       <div className="max-w-xl mx-auto space-y-5">
 
-        {/* Map */}
+        {/* Map preview */}
         <MapView from={from || 'موقعي الحالي'} to={to || 'الوجهة'} height="260px" />
 
         {/* Location inputs */}
@@ -71,7 +81,9 @@ export default function RequestRide() {
                 onClick={() => setVehicle(v.id)}
                 className={clsx(
                   'card text-right transition-all',
-                  vehicle === v.id ? 'border-2 border-primary-500 bg-primary-50 dark:bg-primary-900/10' : 'border-2 border-transparent hover:border-gray-200'
+                  vehicle === v.id
+                    ? 'border-2 border-primary-500 bg-primary-50 dark:bg-primary-900/10'
+                    : 'border-2 border-transparent hover:border-gray-200 dark:hover:border-dark-border'
                 )}
               >
                 <div className="flex items-center justify-between mb-1">
@@ -97,7 +109,9 @@ export default function RequestRide() {
                 onClick={() => setPayment(p.id)}
                 className={clsx(
                   'flex items-center gap-2 px-4 py-2 rounded-xl border-2 text-sm font-semibold transition-all',
-                  payment === p.id ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/10 text-primary-700 dark:text-primary-400' : 'border-gray-200 dark:border-dark-border hover:border-gray-300'
+                  payment === p.id
+                    ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/10 text-primary-700 dark:text-primary-400'
+                    : 'border-gray-200 dark:border-dark-border hover:border-gray-300'
                 )}
               >
                 <span>{p.icon}</span>

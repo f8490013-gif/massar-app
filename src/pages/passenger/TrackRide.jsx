@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
 import Layout from '../../components/Layout'
@@ -8,21 +8,34 @@ import { Phone, MessageCircle, Star, X, Navigation } from 'lucide-react'
 export default function TrackRide() {
   const { activeRide, setActiveRide, showNotification } = useApp()
   const navigate = useNavigate()
-  const [eta, setEta] = useState(5)
 
-  // Countdown ETA
+  const [etaMin, setEtaMin] = useState(5)
+  const [etaSec, setEtaSec] = useState(24)
+
+  // Countdown timer — no random values during render
   useEffect(() => {
-    if (eta <= 0) return
-    const t = setInterval(() => setEta(e => Math.max(0, e - 1)), 60000)
-    return () => clearInterval(t)
-  }, [eta])
+    const id = setInterval(() => {
+      setEtaSec(s => {
+        if (s > 0) return s - 1
+        setEtaMin(m => Math.max(0, m - 1))
+        return 59
+      })
+    }, 1000)
+    return () => clearInterval(id)
+  }, [])
 
   const ride = activeRide || {
-    from:    'مدرسة الأمل الأهلية',
-    to:      'حي الياسمين',
-    driver:  { name: 'محمد علي', rating: 4.9, car: 'تويوتا كامري 2023', plate: 'ن ص م 1234' },
-    price:   '25 ر.س',
+    from:   'مدرسة الأمل الأهلية',
+    to:     'حي الياسمين',
+    driver: { name: 'محمد علي', rating: 4.9, car: 'تويوتا كامري 2023', plate: 'ن ص م 1234' },
+    price:  '25 ر.س',
   }
+
+  // Safely display price whether it is a string or an object
+  const priceDisplay =
+    typeof ride.price === 'string'
+      ? ride.price
+      : ride.price?.label ?? `${ride.price} ر.س`
 
   function cancelRide() {
     showNotification('تم إلغاء الرحلة', 'error')
@@ -37,14 +50,16 @@ export default function TrackRide() {
         {/* Map */}
         <MapView from={ride.from} to={ride.to} height="300px" />
 
-        {/* ETA chip */}
+        {/* ETA + price */}
         <div className="flex gap-3">
           <div className="card flex-1 text-center bg-primary-500 text-black border-0">
-            <p className="text-3xl font-black">{eta}:{String(Math.floor(Math.random()*60)).padStart(2,'0')}</p>
+            <p className="text-3xl font-black tabular-nums">
+              {String(etaMin).padStart(2, '0')}:{String(etaSec).padStart(2, '0')}
+            </p>
             <p className="text-xs font-semibold opacity-80 mt-1">الوقت المتبقي للوصول</p>
           </div>
           <div className="card flex-1 text-center">
-            <p className="text-3xl font-black">{ride.price || '25 ر.س'}</p>
+            <p className="text-3xl font-black">{priceDisplay}</p>
             <p className="text-xs text-gray-400 mt-1">السعر الإجمالي</p>
           </div>
         </div>
@@ -64,7 +79,6 @@ export default function TrackRide() {
                 <span className="text-xs text-gray-400">• {ride.driver?.plate}</span>
               </div>
             </div>
-            {/* Contact buttons */}
             <div className="flex gap-2">
               <button className="w-10 h-10 bg-green-50 dark:bg-green-900/20 text-green-600 rounded-xl flex items-center justify-center hover:bg-green-100 transition-colors">
                 <Phone size={18} />
@@ -96,11 +110,11 @@ export default function TrackRide() {
           <p className="font-bold mb-4">حالة الرحلة</p>
           <div className="space-y-3">
             {[
-              { label: 'تم قبول الطلب',          done: true },
-              { label: 'السائق في الطريق إليك',  done: true },
-              { label: 'تم الوصول لنقطة الانطلاق', done: false },
-              { label: 'في الطريق للوجهة',        done: false },
-              { label: 'تم الوصول',              done: false },
+              { label: 'تم قبول الطلب',              done: true },
+              { label: 'السائق في الطريق إليك',      done: true },
+              { label: 'تم الوصول لنقطة الانطلاق',   done: false },
+              { label: 'في الطريق للوجهة',            done: false },
+              { label: 'تم الوصول',                   done: false },
             ].map((s, i) => (
               <div key={i} className="flex items-center gap-3">
                 <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs shrink-0
