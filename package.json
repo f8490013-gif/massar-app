@@ -1,7 +1,7 @@
 {
   "name": "massar-app",
   "private": true,
-  "version": "2.0.0",
+  "version": "3.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -14,8 +14,8 @@
     "react-router-dom": "^6.24.1",
     "lucide-react": "^0.400.0",
     "recharts": "^2.12.7",
-    "leaflet": "^1.9.4",
-    "react-leaflet": "^4.2.1",
+    "@react-google-maps/api": "^2.19.3",
+    "firebase": "^10.12.3",
     "clsx": "^2.1.1"
   },
   "devDependencies": {

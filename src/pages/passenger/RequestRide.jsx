@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
 import Layout from '../../components/Layout'
@@ -6,10 +6,9 @@ import RealMap from '../../components/common/RealMap'
 import { vehicleTypes, paymentMethods } from '../../data/mockData'
 import { useGeolocation } from '../../hooks/useGeolocation'
 import { useAddressSearch } from '../../hooks/useAddressSearch'
-import { MapPin, Navigation, Locate, Loader, Search } from 'lucide-react'
+import { MapPin, Navigation, Locate, Loader } from 'lucide-react'
 import clsx from 'clsx'
 
-// Mock nearby Riyadh coords for demo destination search
 const QUICK_PLACES = [
   { label: 'مدرسة الأمل الأهلية',  lat: 24.7200, lng: 46.6900 },
   { label: 'مطار الملك خالد',       lat: 24.9578, lng: 46.6989 },
@@ -18,7 +17,8 @@ const QUICK_PLACES = [
   { label: 'حي العليا',              lat: 24.7167, lng: 46.6667 },
 ]
 
-function AddressInput({ label, value, onChange, onSelect, placeholder, icon: Icon, iconColor, showLocate, onLocate, locating }) {
+// ── Address input with Google Places autocomplete ──────────────────────────
+function AddressInput({ value, onChange, onSelect, placeholder, icon: Icon, iconColor, showLocate, onLocate, locating }) {
   const { results, loading, search, clear } = useAddressSearch()
   const [focused, setFocused] = useState(false)
   const inputRef = useRef(null)
@@ -67,7 +67,6 @@ function AddressInput({ label, value, onChange, onSelect, placeholder, icon: Ico
         )}
       </div>
 
-      {/* Dropdown */}
       {showDropdown && (
         <div className="address-dropdown">
           {loading && (
@@ -91,36 +90,69 @@ function AddressInput({ label, value, onChange, onSelect, placeholder, icon: Ico
   )
 }
 
+// ── Destination-only search (no locate button) ─────────────────────────────
+function DestinationInput({ value, onChange, onSelect, placeholder }) {
+  const { results, loading, search, clear } = useAddressSearch()
+  const [focused, setFocused] = useState(false)
+
+  return (
+    <div className="relative">
+      <Navigation size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400" />
+      <input
+        className="input-field pr-11"
+        placeholder={placeholder}
+        value={value}
+        onChange={e => { onChange(e.target.value); search(e.target.value) }}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setTimeout(() => setFocused(false), 200)}
+        dir="rtl"
+      />
+      {focused && (results.length > 0 || loading) && (
+        <div className="address-dropdown">
+          {loading && (
+            <div className="flex items-center gap-2 px-4 py-3 text-gray-400 text-sm">
+              <Loader size={14} className="animate-spin" /> جارٍ البحث…
+            </div>
+          )}
+          {results.map((r, i) => (
+            <button
+              key={i}
+              onMouseDown={() => { onChange(r.label); onSelect({ lat: r.lat, lng: r.lng }); clear() }}
+              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-dark-border text-right transition-colors border-b border-gray-50 dark:border-dark-border last:border-0"
+            >
+              <Navigation size={14} className="text-gray-400 shrink-0" />
+              <span className="text-sm truncate">{r.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Main page ──────────────────────────────────────────────────────────────
 export default function RequestRide() {
-  const [fromText, setFromText]   = useState('')
-  const [toText, setToText]       = useState('')
-  const [fromCoords, setFromCoords] = useState(null)
-  const [toCoords, setToCoords]   = useState(null)
-  const [vehicle, setVehicle]     = useState('economy')
-  const [payment, setPayment]     = useState('mada')
-  const [loading, setLoading]     = useState(false)
-  const [confirmed, setConfirmed] = useState(false)
+  const [fromText, setFromText]     = useState('')
+  const [toText, setToText]         = useState('')
+  const [fromCoords, setFromCoords] = useState(null)   // [lat, lng]
+  const [toCoords, setToCoords]     = useState(null)   // [lat, lng]
+  const [vehicle, setVehicle]       = useState('economy')
+  const [payment, setPayment]       = useState('mada')
+  const [loading, setLoading]       = useState(false)
+  const [confirmed, setConfirmed]   = useState(false)
 
   const { showNotification, setActiveRide } = useApp()
-  const { coords, address, loading: locating, getLocation } = useGeolocation()
+  const { loading: locating, getLocation }  = useGeolocation()
   const navigate = useNavigate()
 
-  // Auto-fill "from" when geolocation resolves
+  // Use my location → fills the "from" field
   async function handleLocate() {
-    await getLocation()
-    if (coords) {
-      setFromText(address || 'موقعي الحالي')
-      setFromCoords(coords)
+    const result = await getLocation()   // returns { coords, address } or null
+    if (result) {
+      setFromText(result.address || 'موقعي الحالي')
+      setFromCoords(result.coords)       // [lat, lng]
     }
   }
-
-  // Watch geolocation state changes
-  useState(() => {
-    if (coords && !fromCoords) {
-      setFromText(address || 'موقعي الحالي')
-      setFromCoords(coords)
-    }
-  })
 
   function handleQuickPlace(place) {
     setToText(place.label)
@@ -136,7 +168,6 @@ export default function RequestRide() {
     await new Promise(r => setTimeout(r, 1500))
     const selected = vehicleTypes.find(v => v.id === vehicle)
 
-    // Create a driver position slightly offset from origin for tracking
     const driverStart = fromCoords
       ? [fromCoords[0] - 0.012, fromCoords[1] - 0.008]
       : null
@@ -169,12 +200,13 @@ export default function RequestRide() {
           destination={toCoords}
           height="260px"
           interactive={false}
+          fromLabel={fromText}
+          toLabel={toText}
         />
 
         {/* Location inputs */}
         <div className="card space-y-3">
           <AddressInput
-            label="من"
             value={fromText}
             onChange={setFromText}
             onSelect={c => setFromCoords([c.lat, c.lng])}
@@ -182,15 +214,11 @@ export default function RequestRide() {
             icon={MapPin}
             iconColor="text-primary-500"
             showLocate
-            onLocate={() => {
-              getLocation().then(() => {
-                if (coords) { setFromText(address); setFromCoords(coords) }
-              })
-            }}
+            onLocate={handleLocate}
             locating={locating}
           />
           <div className="h-px bg-gray-100 dark:bg-dark-border mx-2" />
-          <AddressSearch
+          <DestinationInput
             value={toText}
             onChange={setToText}
             onSelect={c => setToCoords([c.lat, c.lng])}
@@ -283,7 +311,7 @@ export default function RequestRide() {
           </div>
         )}
 
-        {/* Book */}
+        {/* Book button */}
         <button
           onClick={book}
           disabled={loading || confirmed}
@@ -295,45 +323,5 @@ export default function RequestRide() {
         </button>
       </div>
     </Layout>
-  )
-}
-
-// Inline simplified search for "to" field
-function AddressSearch({ value, onChange, onSelect, placeholder }) {
-  const { results, loading, search, clear } = useAddressSearch()
-  const [focused, setFocused] = useState(false)
-
-  return (
-    <div className="relative">
-      <Navigation size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400" />
-      <input
-        className="input-field pr-11"
-        placeholder={placeholder}
-        value={value}
-        onChange={e => { onChange(e.target.value); search(e.target.value) }}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setTimeout(() => setFocused(false), 200)}
-        dir="rtl"
-      />
-      {focused && (results.length > 0 || loading) && (
-        <div className="address-dropdown">
-          {loading && (
-            <div className="flex items-center gap-2 px-4 py-3 text-gray-400 text-sm">
-              <Loader size={14} className="animate-spin" /> جارٍ البحث…
-            </div>
-          )}
-          {results.map((r, i) => (
-            <button
-              key={i}
-              onMouseDown={() => { onChange(r.label); onSelect({ lat: r.lat, lng: r.lng }); clear() }}
-              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-dark-border text-right transition-colors border-b border-gray-50 dark:border-dark-border last:border-0"
-            >
-              <Navigation size={14} className="text-gray-400 shrink-0" />
-              <span className="text-sm truncate">{r.label}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
   )
 }
