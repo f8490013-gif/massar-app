@@ -3,17 +3,8 @@
 @tailwind utilities;
 
 @layer base {
-  * {
-    font-family: 'Cairo', 'Noto Sans Arabic', sans-serif;
-  }
-
-  body {
-    @apply bg-gray-50 text-gray-900 transition-colors duration-200;
-  }
-
-  .dark body {
-    @apply bg-dark-bg text-gray-100;
-  }
+  * { font-family: 'Cairo', 'Noto Sans Arabic', sans-serif; }
+  html { scroll-behavior: smooth; }
 }
 
 @layer components {
@@ -23,19 +14,16 @@
            transition-all duration-200 shadow-lg hover:shadow-primary-500/30
            disabled:opacity-50 disabled:cursor-not-allowed;
   }
-
   .btn-outline {
     @apply border-2 border-primary-500 text-primary-600 dark:text-primary-400
            hover:bg-primary-500 hover:text-black font-bold py-3 px-6 rounded-2xl
            transition-all duration-200;
   }
-
   .card {
     @apply bg-white dark:bg-dark-card rounded-3xl shadow-sm
            border border-gray-100 dark:border-dark-border p-5
            transition-all duration-200;
   }
-
   .input-field {
     @apply w-full bg-gray-100 dark:bg-dark-border rounded-2xl
            px-4 py-3 text-gray-900 dark:text-white
@@ -44,23 +32,17 @@
            focus:border-primary-500 focus:outline-none focus:bg-white dark:focus:bg-dark-muted
            transition-all duration-200;
   }
-
   .sidebar-link {
     @apply flex items-center gap-3 px-4 py-3 rounded-2xl
            text-gray-600 dark:text-gray-400
            hover:bg-primary-50 dark:hover:bg-dark-border hover:text-primary-600 dark:hover:text-primary-400
            transition-all duration-200 cursor-pointer font-medium;
   }
-
   .sidebar-link.active {
     @apply bg-primary-500 text-black font-bold
-           hover:bg-primary-600 hover:text-black dark:hover:text-black;
+           hover:bg-primary-600 hover:text-black;
   }
-
-  .badge {
-    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold;
-  }
-
+  .badge { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold; }
   .badge-success { @apply bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400; }
   .badge-warning { @apply bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400; }
   .badge-error   { @apply bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400; }
@@ -72,19 +54,36 @@
 ::-webkit-scrollbar-track { @apply bg-transparent; }
 ::-webkit-scrollbar-thumb { @apply bg-gray-300 dark:bg-dark-muted rounded-full; }
 
-/* Map placeholder */
-.map-placeholder {
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-  position: relative;
-  overflow: hidden;
+/* Leaflet overrides — keep map inside rounded containers */
+.leaflet-container {
+  font-family: 'Cairo', sans-serif !important;
+  border-radius: inherit;
+}
+.leaflet-control-attribution {
+  font-size: 9px !important;
+  opacity: 0.6;
+}
+.leaflet-control-zoom {
+  border: none !important;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.15) !important;
+}
+.leaflet-control-zoom a {
+  border-radius: 8px !important;
+  border: none !important;
+  font-size: 16px !important;
 }
 
-.map-placeholder::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(245,197,24,0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(245,197,24,0.08) 1px, transparent 1px);
-  background-size: 40px 40px;
+/* Custom map markers */
+.marker-origin, .marker-dest, .marker-driver, .marker-school {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Address search dropdown */
+.address-dropdown {
+  @apply absolute top-full right-0 left-0 z-50 mt-1
+         bg-white dark:bg-dark-card rounded-2xl shadow-2xl
+         border border-gray-100 dark:border-dark-border
+         overflow-hidden max-h-56 overflow-y-auto;
 }
