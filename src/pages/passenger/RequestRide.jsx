@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../../context/AppContext'
 import Layout from '../../components/Layout'
@@ -6,6 +6,7 @@ import RealMap from '../../components/common/RealMap'
 import { vehicleTypes, paymentMethods } from '../../data/mockData'
 import { useGeolocation } from '../../hooks/useGeolocation'
 import { useAddressSearch } from '../../hooks/useAddressSearch'
+import { createTrip } from '../../firebase/db'
 import { MapPin, Navigation, Locate, Loader } from 'lucide-react'
 import clsx from 'clsx'
 
@@ -17,16 +18,11 @@ const QUICK_PLACES = [
   { label: 'حي العليا',              lat: 24.7167, lng: 46.6667 },
 ]
 
-// ── Address input with Google Places autocomplete ──────────────────────────
+// ── Address input with Places autocomplete ──────────────────────────────────
 function AddressInput({ value, onChange, onSelect, placeholder, icon: Icon, iconColor, showLocate, onLocate, locating }) {
   const { results, loading, search, clear } = useAddressSearch()
   const [focused, setFocused] = useState(false)
   const inputRef = useRef(null)
-
-  function handleChange(v) {
-    onChange(v)
-    search(v)
-  }
 
   function handleSelect(r) {
     onChange(r.label)
@@ -46,27 +42,19 @@ function AddressInput({ value, onChange, onSelect, placeholder, icon: Icon, icon
           className="input-field pr-11 pl-11"
           placeholder={placeholder}
           value={value}
-          onChange={e => handleChange(e.target.value)}
+          onChange={e => { onChange(e.target.value); search(e.target.value) }}
           onFocus={() => setFocused(true)}
           onBlur={() => setTimeout(() => setFocused(false), 200)}
           dir="rtl"
         />
         {showLocate && (
-          <button
-            type="button"
-            onClick={onLocate}
-            disabled={locating}
+          <button type="button" onClick={onLocate} disabled={locating}
             className="absolute left-3 top-1/2 -translate-y-1/2 text-primary-500 hover:text-primary-700 transition-colors"
-            title="استخدم موقعي الحالي"
-          >
-            {locating
-              ? <Loader size={16} className="animate-spin" />
-              : <Locate size={16} />
-            }
+            title="استخدم موقعي الحالي">
+            {locating ? <Loader size={16} className="animate-spin" /> : <Locate size={16} />}
           </button>
         )}
       </div>
-
       {showDropdown && (
         <div className="address-dropdown">
           {loading && (
@@ -75,11 +63,8 @@ function AddressInput({ value, onChange, onSelect, placeholder, icon: Icon, icon
             </div>
           )}
           {results.map((r, i) => (
-            <button
-              key={i}
-              onMouseDown={() => handleSelect(r)}
-              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-dark-border text-right transition-colors border-b border-gray-50 dark:border-dark-border last:border-0"
-            >
+            <button key={i} onMouseDown={() => handleSelect(r)}
+              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-dark-border text-right transition-colors border-b border-gray-50 dark:border-dark-border last:border-0">
               <MapPin size={14} className="text-primary-500 shrink-0" />
               <span className="text-sm truncate">{r.label}</span>
             </button>
@@ -90,7 +75,6 @@ function AddressInput({ value, onChange, onSelect, placeholder, icon: Icon, icon
   )
 }
 
-// ── Destination-only search (no locate button) ─────────────────────────────
 function DestinationInput({ value, onChange, onSelect, placeholder }) {
   const { results, loading, search, clear } = useAddressSearch()
   const [focused, setFocused] = useState(false)
@@ -115,11 +99,8 @@ function DestinationInput({ value, onChange, onSelect, placeholder }) {
             </div>
           )}
           {results.map((r, i) => (
-            <button
-              key={i}
-              onMouseDown={() => { onChange(r.label); onSelect({ lat: r.lat, lng: r.lng }); clear() }}
-              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-dark-border text-right transition-colors border-b border-gray-50 dark:border-dark-border last:border-0"
-            >
+            <button key={i} onMouseDown={() => { onChange(r.label); onSelect({ lat: r.lat, lng: r.lng }); clear() }}
+              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-dark-border text-right transition-colors border-b border-gray-50 dark:border-dark-border last:border-0">
               <Navigation size={14} className="text-gray-400 shrink-0" />
               <span className="text-sm truncate">{r.label}</span>
             </button>
@@ -130,33 +111,27 @@ function DestinationInput({ value, onChange, onSelect, placeholder }) {
   )
 }
 
-// ── Main page ──────────────────────────────────────────────────────────────
+// ── Main page ────────────────────────────────────────────────────────────────
 export default function RequestRide() {
   const [fromText, setFromText]     = useState('')
   const [toText, setToText]         = useState('')
   const [fromCoords, setFromCoords] = useState(null)   // [lat, lng]
-  const [toCoords, setToCoords]     = useState(null)   // [lat, lng]
+  const [toCoords, setToCoords]     = useState(null)
   const [vehicle, setVehicle]       = useState('economy')
   const [payment, setPayment]       = useState('mada')
   const [loading, setLoading]       = useState(false)
   const [confirmed, setConfirmed]   = useState(false)
 
-  const { showNotification, setActiveRide } = useApp()
-  const { loading: locating, getLocation }  = useGeolocation()
+  const { user, showNotification, setActiveRide, isFirebase } = useApp()
+  const { loading: locating, getLocation }                    = useGeolocation()
   const navigate = useNavigate()
 
-  // Use my location → fills the "from" field
   async function handleLocate() {
-    const result = await getLocation()   // returns { coords, address } or null
+    const result = await getLocation()
     if (result) {
       setFromText(result.address || 'موقعي الحالي')
-      setFromCoords(result.coords)       // [lat, lng]
+      setFromCoords(result.coords)
     }
-  }
-
-  function handleQuickPlace(place) {
-    setToText(place.label)
-    setToCoords([place.lat, place.lng])
   }
 
   async function book() {
@@ -165,14 +140,43 @@ export default function RequestRide() {
       return
     }
     setLoading(true)
-    await new Promise(r => setTimeout(r, 1500))
+
     const selected = vehicleTypes.find(v => v.id === vehicle)
+    // Extract numeric price
+    const priceNum = parseInt(selected?.price?.replace(/\D/g, '')) || 0
 
     const driverStart = fromCoords
       ? [fromCoords[0] - 0.012, fromCoords[1] - 0.008]
       : null
 
+    let tripId = null
+
+    // Create real Firestore trip when Firebase is configured
+    if (isFirebase && user?.uid) {
+      try {
+        tripId = await createTrip({
+          passengerId:   user.uid,
+          passengerName: user.name,
+          from:          fromText,
+          to:            toText,
+          fromCoords:    fromCoords ? { lat: fromCoords[0], lng: fromCoords[1] } : null,
+          toCoords:      toCoords   ? { lat: toCoords[0],   lng: toCoords[1]   } : null,
+          vehicle,
+          payment,
+          price:         selected?.price ?? '—',
+          priceNum,
+        })
+      } catch (err) {
+        console.error('createTrip error:', err)
+        // Continue in demo mode if Firestore fails
+      }
+    } else {
+      // Demo: simulate a short delay
+      await new Promise(r => setTimeout(r, 1200))
+    }
+
     setActiveRide({
+      id:          tripId,
       from:        fromText,
       to:          toText,
       fromCoords,
@@ -180,12 +184,14 @@ export default function RequestRide() {
       driverStart,
       vehicle,
       driver: { name: 'محمد علي', rating: 4.9, car: 'تويوتا كامري 2023', plate: 'ن ص م 1234', phone: '+966501234567' },
-      price: selected?.price ?? '—',
+      price:       selected?.price ?? '—',
+      priceNum,
     })
-    showNotification('تم تأكيد الطلب! جارٍ البحث عن سائق…', 'success')
+
+    showNotification('تم إرسال الطلب! جارٍ البحث عن سائق…', 'success')
     setLoading(false)
     setConfirmed(true)
-    setTimeout(() => navigate('/passenger/track'), 800)
+    setTimeout(() => navigate('/passenger/track'), 700)
   }
 
   const selectedVehicle = vehicleTypes.find(v => v.id === vehicle)
@@ -194,7 +200,7 @@ export default function RequestRide() {
     <Layout title="طلب مشوار">
       <div className="max-w-xl mx-auto space-y-5">
 
-        {/* Live map preview */}
+        {/* Map preview */}
         <RealMap
           origin={fromCoords}
           destination={toCoords}
@@ -231,16 +237,13 @@ export default function RequestRide() {
           <p className="text-xs text-gray-400 mb-2 font-semibold">وجهات شائعة</p>
           <div className="flex gap-2 flex-wrap">
             {QUICK_PLACES.map(p => (
-              <button
-                key={p.label}
-                onClick={() => handleQuickPlace(p)}
+              <button key={p.label} onClick={() => { setToText(p.label); setToCoords([p.lat, p.lng]) }}
                 className={clsx(
                   'text-xs px-3 py-1.5 rounded-xl border font-medium transition-all',
                   toText === p.label
                     ? 'bg-primary-500 text-black border-primary-500'
                     : 'border-gray-200 dark:border-dark-border hover:border-primary-300 text-gray-600 dark:text-gray-400'
-                )}
-              >
+                )}>
                 {p.label}
               </button>
             ))}
@@ -252,16 +255,13 @@ export default function RequestRide() {
           <h3 className="font-bold mb-3 text-sm">نوع المركبة</h3>
           <div className="grid grid-cols-2 gap-3">
             {vehicleTypes.map(v => (
-              <button
-                key={v.id}
-                onClick={() => setVehicle(v.id)}
+              <button key={v.id} onClick={() => setVehicle(v.id)}
                 className={clsx(
                   'card text-right transition-all',
                   vehicle === v.id
                     ? 'border-2 border-primary-500 bg-primary-50 dark:bg-primary-900/10'
                     : 'border-2 border-transparent hover:border-gray-200 dark:hover:border-dark-border'
-                )}
-              >
+                )}>
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-2xl">{v.icon}</span>
                   {vehicle === v.id && <span className="text-primary-500 font-black text-xs">✓</span>}
@@ -280,16 +280,13 @@ export default function RequestRide() {
           <h3 className="font-bold mb-3 text-sm">طريقة الدفع</h3>
           <div className="card flex items-center gap-3 flex-wrap">
             {paymentMethods.map(p => (
-              <button
-                key={p.id}
-                onClick={() => setPayment(p.id)}
+              <button key={p.id} onClick={() => setPayment(p.id)}
                 className={clsx(
                   'flex items-center gap-2 px-4 py-2 rounded-xl border-2 text-sm font-semibold transition-all',
                   payment === p.id
                     ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/10 text-primary-700 dark:text-primary-400'
                     : 'border-gray-200 dark:border-dark-border hover:border-gray-300'
-                )}
-              >
+                )}>
                 <span>{p.icon}</span>
                 <span>{p.label}</span>
               </button>
@@ -311,14 +308,11 @@ export default function RequestRide() {
           </div>
         )}
 
-        {/* Book button */}
-        <button
-          onClick={book}
-          disabled={loading || confirmed}
-          className="btn-primary w-full text-lg py-4 flex items-center justify-center gap-3"
-        >
-          {loading   ? <><span className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" /> جارٍ البحث…</> :
-           confirmed ? '✓ تم تأكيد الطلب' :
+        {/* Book */}
+        <button onClick={book} disabled={loading || confirmed}
+          className="btn-primary w-full text-lg py-4 flex items-center justify-center gap-3">
+          {loading   ? <><span className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" /> جارٍ البحث عن سائق…</> :
+           confirmed ? '✓ تم إرسال الطلب' :
            'تأكيد الطلب'}
         </button>
       </div>

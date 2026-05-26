@@ -1,15 +1,29 @@
+import { useState, useEffect } from 'react'
 import Layout from '../../components/Layout'
-import { adminStats, adminTripsChart, adminRecentTrips } from '../../data/mockData'
+import { adminStats as mockStats, adminTripsChart, adminRecentTrips as mockRecentTrips } from '../../data/mockData'
 import StatsCard from '../../components/common/StatsCard'
 import { useApp } from '../../context/AppContext'
-import { Users, School, Car, DollarSign, TrendingUp } from 'lucide-react'
+import { getAdminStats, listenAllTrips } from '../../firebase/db'
+import { Users, School, Car, DollarSign, TrendingUp, Loader } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import clsx from 'clsx'
 
 const statusStyle = {
-  'مكتمل': 'badge-success',
-  'جارٍ':  'badge-warning',
-  'ملغي':  'badge-error',
+  completed:   'badge-success',
+  'مكتمل':    'badge-success',
+  accepted:    'badge-warning',
+  pending:     'badge-warning',
+  'جارٍ':     'badge-warning',
+  cancelled:   'badge-error',
+  'ملغي':     'badge-error',
+}
+
+const statusAr = {
+  pending:     'معلق',
+  accepted:    'تم القبول',
+  in_progress: 'جارٍ',
+  completed:   'مكتمل',
+  cancelled:   'ملغي',
 }
 
 const CustomTooltip = ({ active, payload, label }) => {
@@ -25,9 +39,41 @@ const CustomTooltip = ({ active, payload, label }) => {
 }
 
 export default function AdminDashboard() {
-  const { theme } = useApp()
+  const { theme, isFirebase } = useApp()
   const gridColor = theme === 'dark' ? '#2c2c2e' : '#f0f0f0'
   const axisColor = theme === 'dark' ? '#6b7280' : '#9ca3af'
+
+  const [stats, setStats]             = useState(mockStats)
+  const [recentTrips, setRecentTrips] = useState(mockRecentTrips)
+  const [loadingStats, setLoadingStats] = useState(false)
+
+  // Load real stats from Firestore
+  useEffect(() => {
+    if (!isFirebase) return
+    setLoadingStats(true)
+    getAdminStats()
+      .then(s => setStats(s))
+      .catch(() => {})
+      .finally(() => setLoadingStats(false))
+  }, [isFirebase])
+
+  // Real-time trips listener
+  useEffect(() => {
+    if (!isFirebase) return
+    const unsub = listenAllTrips(trips => {
+      setRecentTrips(trips.map(t => ({
+        id:     t.id,
+        school: t.to || t.from || '—',
+        driver: t.driverName || '—',
+        time:   t.createdAt?.toDate
+          ? t.createdAt.toDate().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })
+          : '—',
+        amount: t.priceNum || 0,
+        status: statusAr[t.status] || t.status,
+      })))
+    })
+    return unsub
+  }, [isFirebase])
 
   return (
     <Layout title="لوحة الإدارة">
@@ -35,10 +81,34 @@ export default function AdminDashboard() {
 
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatsCard label="إجمالي السائقين"  value={adminStats.passengers.toLocaleString()} icon={Users}      color="yellow" trend="+12%" />
-          <StatsCard label="إجمالي المدارس"   value={adminStats.schools}                     icon={School}     color="blue"   trend="+3" />
-          <StatsCard label="إجمالي الرحلات"   value={adminStats.trips.toLocaleString()}      icon={Car}        color="green"  trend="+8%" />
-          <StatsCard label="الإيرادات (ر.س)"  value={adminStats.revenue.toLocaleString()}    icon={DollarSign} color="purple" trend="+15%" />
+          <StatsCard
+            label="إجمالي الركاب"
+            value={loadingStats ? '…' : stats.passengers?.toLocaleString()}
+            icon={Users}
+            color="yellow"
+            trend="+12%"
+          />
+          <StatsCard
+            label="إجمالي المدارس"
+            value={loadingStats ? '…' : stats.schools}
+            icon={School}
+            color="blue"
+            trend="+3"
+          />
+          <StatsCard
+            label="إجمالي الرحلات"
+            value={loadingStats ? '…' : stats.trips?.toLocaleString()}
+            icon={Car}
+            color="green"
+            trend="+8%"
+          />
+          <StatsCard
+            label="الإيرادات (ر.س)"
+            value={loadingStats ? '…' : stats.revenue?.toLocaleString()}
+            icon={DollarSign}
+            color="purple"
+            trend="+15%"
+          />
         </div>
 
         {/* Chart */}
@@ -72,40 +142,50 @@ export default function AdminDashboard() {
           </ResponsiveContainer>
         </div>
 
-        {/* Recent trips table */}
+        {/* Recent trips */}
         <div className="card">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-bold">الرحلات الأخيرة</h2>
-            <button className="text-sm text-primary-600 dark:text-primary-400 font-semibold">عرض الكل</button>
+            <h2 className="font-bold">
+              الرحلات الأخيرة
+              {isFirebase && (
+                <span className="mr-2 text-xs text-green-500 font-normal">● مباشر</span>
+              )}
+            </h2>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-right text-xs text-gray-400 border-b border-gray-100 dark:border-dark-border">
-                  <th className="pb-3 font-semibold">المدرسة / الوجهة</th>
-                  <th className="pb-3 font-semibold">السائق</th>
-                  <th className="pb-3 font-semibold">الوقت</th>
-                  <th className="pb-3 font-semibold">المبلغ</th>
-                  <th className="pb-3 font-semibold">الحالة</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50 dark:divide-dark-border">
-                {adminRecentTrips.map(trip => (
-                  <tr key={trip.id} className="hover:bg-gray-50 dark:hover:bg-dark-border/50 transition-colors">
-                    <td className="py-3 font-medium">{trip.school}</td>
-                    <td className="py-3 text-gray-500">{trip.driver}</td>
-                    <td className="py-3 text-gray-500">{trip.time}</td>
-                    <td className="py-3 font-bold">{trip.amount > 0 ? `${trip.amount} ر.س` : '—'}</td>
-                    <td className="py-3">
-                      <span className={clsx('badge', statusStyle[trip.status] || 'badge-info')}>
-                        {trip.status}
-                      </span>
-                    </td>
+          {loadingStats && isFirebase ? (
+            <div className="flex items-center justify-center py-8 text-gray-400 gap-2">
+              <Loader size={18} className="animate-spin" /> جارٍ التحميل…
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-right text-xs text-gray-400 border-b border-gray-100 dark:border-dark-border">
+                    <th className="pb-3 font-semibold">الوجهة</th>
+                    <th className="pb-3 font-semibold">السائق</th>
+                    <th className="pb-3 font-semibold">الوقت</th>
+                    <th className="pb-3 font-semibold">المبلغ</th>
+                    <th className="pb-3 font-semibold">الحالة</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-gray-50 dark:divide-dark-border">
+                  {recentTrips.slice(0, 10).map(trip => (
+                    <tr key={trip.id} className="hover:bg-gray-50 dark:hover:bg-dark-border/50 transition-colors">
+                      <td className="py-3 font-medium">{trip.school}</td>
+                      <td className="py-3 text-gray-500">{trip.driver}</td>
+                      <td className="py-3 text-gray-500">{trip.time}</td>
+                      <td className="py-3 font-bold">{trip.amount > 0 ? `${trip.amount} ر.س` : '—'}</td>
+                      <td className="py-3">
+                        <span className={clsx('badge', statusStyle[trip.status] || 'badge-info')}>
+                          {trip.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         {/* Quick actions */}

@@ -8,23 +8,22 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 
-// ── nav definitions ────────────────────────────────────────────────────────
 const passengerNav = [
-  { path: '/passenger',          label: 'الرئيسية',     icon: Home },
-  { path: '/passenger/request',  label: 'طلب مشوار',   icon: Car },
-  { path: '/passenger/track',    label: 'تتبع الرحلة', icon: MapPin },
-  { path: '/passenger/school',   label: 'النقل المدرسي', icon: School },
-  { path: '/passenger/payment',  label: 'الدفع',       icon: CreditCard },
+  { path: '/passenger',          label: 'الرئيسية',      icon: Home },
+  { path: '/passenger/request',  label: 'طلب مشوار',    icon: Car },
+  { path: '/passenger/track',    label: 'تتبع الرحلة',  icon: MapPin },
+  { path: '/passenger/school',   label: 'نقل مدرسي',    icon: School },
+  { path: '/passenger/payment',  label: 'الدفع',        icon: CreditCard },
+  { path: '/passenger/profile',  label: 'حسابي',        icon: User },
 ]
 const driverNav = [
-  { path: '/driver',             label: 'استقبال الطلبات', icon: ClipboardList },
-  { path: '/driver/rides',       label: 'الرحلات الحالية', icon: Car },
+  { path: '/driver',             label: 'الطلبات الواردة', icon: ClipboardList },
   { path: '/driver/earnings',    label: 'الأرباح',         icon: TrendingUp },
   { path: '/driver/profile',     label: 'الملف الشخصي',   icon: User },
 ]
 const adminNav = [
-  { path: '/admin',              label: 'الرئيسية',    icon: LayoutDashboard },
-  { path: '/admin/passengers',   label: 'السائقون',   icon: Users },
+  { path: '/admin',              label: 'الرئيسية',   icon: LayoutDashboard },
+  { path: '/admin/passengers',   label: 'الركاب',     icon: Users },
   { path: '/admin/schools',      label: 'المدارس',    icon: School },
   { path: '/admin/trips',        label: 'الرحلات',    icon: Car },
   { path: '/admin/payments',     label: 'المدفوعات',  icon: CreditCard },
@@ -33,39 +32,28 @@ const adminNav = [
 ]
 
 function navForRole(role) {
-  if (role === 'driver')    return driverNav
-  if (role === 'admin')     return adminNav
+  if (role === 'driver') return driverNav
+  if (role === 'admin')  return adminNav
   return passengerNav
 }
 
-// ── Sidebar ────────────────────────────────────────────────────────────────
+// ── Sidebar ─────────────────────────────────────────────────────────────────
 function Sidebar({ open, onClose }) {
   const { user, logout, theme, toggleTheme } = useApp()
   const navigate  = useNavigate()
   const location  = useLocation()
   const nav       = navForRole(user?.role)
 
-  function go(path) {
-    navigate(path)
-    onClose()
-  }
+  function go(path) { navigate(path); onClose() }
 
-  function handleLogout() {
-    logout()
-    navigate('/')
-  }
+  async function handleLogout() { await logout(); navigate('/') }
 
   return (
     <>
-      {/* Overlay */}
       {open && (
-        <div
-          className="fixed inset-0 bg-black/40 z-40 lg:hidden"
-          onClick={onClose}
-        />
+        <div className="fixed inset-0 bg-black/40 z-40 lg:hidden" onClick={onClose} />
       )}
 
-      {/* Sidebar panel */}
       <aside className={clsx(
         'fixed top-0 right-0 h-full w-72 z-50 flex flex-col',
         'bg-white dark:bg-dark-card border-l border-gray-100 dark:border-dark-border',
@@ -90,15 +78,18 @@ function Sidebar({ open, onClose }) {
         </div>
 
         {/* User chip */}
-        <div className="mx-4 mt-4 p-3 rounded-2xl bg-primary-50 dark:bg-dark-border flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary-500 flex items-center justify-center text-black font-bold text-lg">
-            {user?.name?.charAt(0)}
+        <button
+          onClick={() => go(user?.role === 'passenger' ? '/passenger/profile' : `/${user?.role}/profile`)}
+          className="mx-4 mt-4 p-3 rounded-2xl bg-primary-50 dark:bg-dark-border flex items-center gap-3 hover:bg-primary-100 dark:hover:bg-dark-muted transition-colors"
+        >
+          <div className="w-10 h-10 rounded-xl bg-primary-500 flex items-center justify-center text-black font-bold text-lg shrink-0">
+            {user?.name?.charAt(0) ?? '؟'}
           </div>
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 text-right">
             <p className="font-bold text-sm truncate">{user?.name}</p>
             <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user?.email}</p>
           </div>
-        </div>
+        </button>
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto p-4 space-y-1">
@@ -119,10 +110,7 @@ function Sidebar({ open, onClose }) {
 
         {/* Footer */}
         <div className="p-4 space-y-2 border-t border-gray-100 dark:border-dark-border">
-          <button
-            onClick={toggleTheme}
-            className="sidebar-link w-full text-right"
-          >
+          <button onClick={toggleTheme} className="sidebar-link w-full text-right">
             {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             <span>{theme === 'dark' ? 'الوضع العادي' : 'الوضع الداكن'}</span>
           </button>
@@ -139,32 +127,40 @@ function Sidebar({ open, onClose }) {
   )
 }
 
-// ── Topbar ─────────────────────────────────────────────────────────────────
+// ── Topbar ───────────────────────────────────────────────────────────────────
 function Topbar({ onMenuOpen, title }) {
-  const { user } = useApp()
+  const { user, isFirebase } = useApp()
+  const navigate = useNavigate()
+
   return (
     <header className="sticky top-0 z-30 bg-white/80 dark:bg-dark-card/80 backdrop-blur-md border-b border-gray-100 dark:border-dark-border px-5 h-16 flex items-center justify-between">
-      <button
-        onClick={onMenuOpen}
-        className="lg:hidden p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-dark-border"
-      >
+      <button onClick={onMenuOpen} className="lg:hidden p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-dark-border">
         <Menu size={20} />
       </button>
       <h1 className="font-bold text-lg">{title}</h1>
       <div className="flex items-center gap-2">
+        {/* Firebase indicator */}
+        {isFirebase && (
+          <span className="hidden sm:block text-xs text-green-500 font-semibold bg-green-50 dark:bg-green-900/20 px-2 py-0.5 rounded-lg">
+            🔥 مباشر
+          </span>
+        )}
         <button className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-dark-border relative">
           <Bell size={20} />
           <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary-500 rounded-full" />
         </button>
-        <div className="w-9 h-9 rounded-xl bg-primary-500 flex items-center justify-center font-bold text-black">
-          {user?.name?.charAt(0)}
-        </div>
+        <button
+          onClick={() => navigate(user?.role === 'passenger' ? '/passenger/profile' : `/${user?.role}/profile`)}
+          className="w-9 h-9 rounded-xl bg-primary-500 flex items-center justify-center font-bold text-black hover:bg-primary-600 transition-colors"
+        >
+          {user?.name?.charAt(0) ?? '؟'}
+        </button>
       </div>
     </header>
   )
 }
 
-// ── Layout ─────────────────────────────────────────────────────────────────
+// ── Layout ───────────────────────────────────────────────────────────────────
 export default function Layout({ children, title = 'مسار' }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   return (

@@ -1,0 +1,54 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuth()  { return request.auth != null; }
+    function uid()     { return request.auth.uid; }
+    function role()    { return get(/databases/$(database)/documents/users/$(uid())).data.role; }
+    function isAdmin() { return isAuth() && role() == 'admin'; }
+    function isDriver(){ return isAuth() && role() == 'driver'; }
+
+    // ── Users ─────────────────────────────────────────────────────────────
+    match /users/{userId} {
+      allow create: if isAuth();
+      allow read:   if isAuth() && (uid() == userId || isAdmin());
+      allow update: if isAuth() && (uid() == userId || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // ── Trips ─────────────────────────────────────────────────────────────
+    match /trips/{tripId} {
+      allow create: if isAuth();
+
+      allow read: if isAuth() && (
+        resource.data.passengerId == uid() ||
+        resource.data.driverId    == uid() ||
+        resource.data.status      == 'pending' ||
+        isAdmin()
+      );
+
+      allow update: if isAuth() && (
+        resource.data.passengerId == uid() ||
+        resource.data.driverId    == uid() ||
+        (resource.data.status == 'pending' && isDriver()) ||
+        isAdmin()
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    // ── Driver locations ───────────────────────────────────────────────────
+    match /driverLocations/{driverId} {
+      allow read:  if isAuth();
+      allow write: if isAuth() && uid() == driverId;
+    }
+
+    // ── School registrations ───────────────────────────────────────────────
+    match /schoolRegistrations/{regId} {
+      allow create: if isAuth();
+      allow read:   if isAuth() && (resource.data.passengerId == uid() || isAdmin());
+      allow update: if isAuth() && (resource.data.passengerId == uid() || isAdmin());
+      allow delete: if isAuth() && (resource.data.passengerId == uid() || isAdmin());
+    }
+  }
+}

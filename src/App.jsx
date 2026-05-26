@@ -10,6 +10,7 @@ import RequestRide      from './pages/passenger/RequestRide'
 import TrackRide        from './pages/passenger/TrackRide'
 import SchoolTransport  from './pages/passenger/SchoolTransport'
 import Payment          from './pages/passenger/Payment'
+import PassengerProfile from './pages/passenger/Profile'
 
 import DriverDash       from './pages/driver/Dashboard'
 import Earnings         from './pages/driver/Earnings'
@@ -34,11 +35,12 @@ export default function App() {
         <Route path="/register" element={<Register />} />
 
         {/* Passenger */}
-        <Route path="/passenger"         element={<Require role="passenger"><PassengerDash /></Require>} />
-        <Route path="/passenger/request" element={<Require role="passenger"><RequestRide /></Require>} />
-        <Route path="/passenger/track"   element={<Require role="passenger"><TrackRide /></Require>} />
-        <Route path="/passenger/school"  element={<Require role="passenger"><SchoolTransport /></Require>} />
-        <Route path="/passenger/payment" element={<Require role="passenger"><Payment /></Require>} />
+        <Route path="/passenger"          element={<Require role="passenger"><PassengerDash /></Require>} />
+        <Route path="/passenger/request"  element={<Require role="passenger"><RequestRide /></Require>} />
+        <Route path="/passenger/track"    element={<Require role="passenger"><TrackRide /></Require>} />
+        <Route path="/passenger/school"   element={<Require role="passenger"><SchoolTransport /></Require>} />
+        <Route path="/passenger/payment"  element={<Require role="passenger"><Payment /></Require>} />
+        <Route path="/passenger/profile"  element={<Require role="passenger"><PassengerProfile /></Require>} />
 
         {/* Driver */}
         <Route path="/driver"          element={<Require role="driver"><DriverDash /></Require>} />

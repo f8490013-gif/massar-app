@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
 import { auth, IS_FIREBASE_CONFIGURED } from '../firebase/config'
 import { getUserProfile } from '../firebase/auth'
@@ -7,18 +7,18 @@ import { loginUser, logoutUser } from '../firebase/auth'
 export const AppContext = createContext(null)
 export const useApp     = () => useContext(AppContext)
 
-// ── Demo users (used when Firebase is not configured) ─────────────────────
+// ── Demo users ────────────────────────────────────────────────────────────
 const DEMO_USERS = {
-  passenger: { uid: 'p1', name: 'مرحبا أحمد',  email: 'passenger@massar.app', role: 'passenger', rating: 4.8, trips: 34,  balance: 0 },
-  driver:    { uid: 'd1', name: 'أحمد السبيعي', email: 'driver@massar.app',    role: 'driver',    rating: 4.9, trips: 312, balance: 456 },
-  admin:     { uid: 'a1', name: 'مشرف النظام',  email: 'admin@massar.app',     role: 'admin',     rating: 5.0, trips: 0,   balance: 0 },
+  passenger: { uid: 'p1', name: 'أحمد الشهري',   email: 'passenger@massar.app', role: 'passenger', rating: 4.8, trips: 34,  balance: 120, city: 'الرياض', phone: '0501234567' },
+  driver:    { uid: 'd1', name: 'محمد السبيعي',  email: 'driver@massar.app',    role: 'driver',    rating: 4.9, trips: 312, balance: 456, city: 'الرياض', phone: '0559876543', car: 'تويوتا كامري', plate: 'ن ص م 1234', carYear: '2023' },
+  admin:     { uid: 'a1', name: 'مشرف النظام',   email: 'admin@massar.app',     role: 'admin',     rating: 5.0, trips: 0,   balance: 0,   city: 'الرياض', phone: '' },
 }
 
 export function AppProvider({ children }) {
-  const [user, setUser]         = useState(null)
-  const [loading, setLoading]   = useState(true)
-  const [theme, setTheme]       = useState(() => localStorage.getItem('massar-theme') || 'light')
-  const [activeRide, setActiveRide] = useState(null)
+  const [user,         setUser]         = useState(null)
+  const [loading,      setLoading]      = useState(true)
+  const [theme,        setTheme]        = useState(() => localStorage.getItem('massar-theme') || 'light')
+  const [activeRide,   setActiveRide]   = useState(null)
   const [notification, setNotification] = useState(null)
 
   // Apply dark class to <html>
@@ -30,9 +30,10 @@ export function AppProvider({ children }) {
   // Auth state listener
   useEffect(() => {
     if (!IS_FIREBASE_CONFIGURED) {
-      // Restore demo session from localStorage
       const saved = localStorage.getItem('massar-demo-user')
-      if (saved) setUser(JSON.parse(saved))
+      if (saved) {
+        try { setUser(JSON.parse(saved)) } catch {}
+      }
       setLoading(false)
       return
     }
@@ -58,15 +59,12 @@ export function AppProvider({ children }) {
   // ── Login ────────────────────────────────────────────────────────────────
   async function login(roleOrEmail, password) {
     if (!IS_FIREBASE_CONFIGURED) {
-      // Demo login — roleOrEmail is a role string
       const u = DEMO_USERS[roleOrEmail] ?? DEMO_USERS.passenger
       setUser(u)
       localStorage.setItem('massar-demo-user', JSON.stringify(u))
       return u
     }
-    // Firebase login
     await loginUser(roleOrEmail, password)
-    // user state is set by onAuthStateChanged listener
   }
 
   // ── Logout ───────────────────────────────────────────────────────────────
@@ -76,6 +74,25 @@ export function AppProvider({ children }) {
     setActiveRide(null)
     localStorage.removeItem('massar-demo-user')
   }
+
+  // ── Update user state (after profile edit) ───────────────────────────────
+  const refreshUser = useCallback(async () => {
+    if (!user?.uid) return
+    if (IS_FIREBASE_CONFIGURED) {
+      const profile = await getUserProfile(user.uid)
+      if (profile) setUser(profile)
+    }
+  }, [user?.uid])
+
+  const patchUser = useCallback((patch) => {
+    setUser(u => {
+      const updated = { ...u, ...patch }
+      if (!IS_FIREBASE_CONFIGURED) {
+        localStorage.setItem('massar-demo-user', JSON.stringify(updated))
+      }
+      return updated
+    })
+  }, [])
 
   function toggleTheme() {
     setTheme(t => (t === 'light' ? 'dark' : 'light'))
@@ -91,12 +108,26 @@ export function AppProvider({ children }) {
     loading,
     login,
     logout,
+    refreshUser,
+    patchUser,
     theme,
     toggleTheme,
     activeRide,
     setActiveRide,
     showNotification,
     isFirebase: IS_FIREBASE_CONFIGURED,
+  }
+
+  // Show full-screen spinner while auth resolves
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-dark-bg">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-16 h-16 bg-primary-500 rounded-2xl flex items-center justify-center font-black text-3xl text-black animate-pulse">م</div>
+          <div className="w-8 h-8 border-3 border-primary-500/30 border-t-primary-500 rounded-full animate-spin" style={{ borderWidth: 3 }} />
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -107,9 +138,9 @@ export function AppProvider({ children }) {
       {notification && (
         <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-[9999]
           px-6 py-3 rounded-2xl shadow-xl font-semibold text-sm animate-slide-up
-          ${notification.type === 'success' ? 'bg-green-500 text-white'    : ''}
-          ${notification.type === 'error'   ? 'bg-red-500 text-white'      : ''}
-          ${notification.type === 'info'    ? 'bg-primary-500 text-black'  : ''}`}>
+          ${notification.type === 'success' ? 'bg-green-500 text-white'   : ''}
+          ${notification.type === 'error'   ? 'bg-red-500 text-white'     : ''}
+          ${notification.type === 'info'    ? 'bg-primary-500 text-black' : ''}`}>
           {notification.msg}
         </div>
       )}
